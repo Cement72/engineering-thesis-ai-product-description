@@ -1,0 +1,20 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - C:\Users\Adam\Desktop\PRACA\images:/home/node/.n8n-files/images
+    environment:
+      - N8N_HOST=n8n
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_METRICS=true
+      # UWAGA: Usunąłem stąd na stałe WEBHOOK_URL, dzięki czemu n8n pozwoli Ci 
+      # ręcznie wpisać dowolny adres w panelu lub pobrać go bezpośrednio z ngroka.
+
+volumes:
+  n8n_data:
