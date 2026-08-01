@@ -42,7 +42,7 @@ services:
     ports:
       - "4040:4040" # To pozwoli Ci wejść na localhost:4040
     environment:
-      NGROK_AUTHTOKEN: 3CfoEpdQJsnuywO5inGMZSsAGVv_7hJ4X17AWRdU1hVAW65y3
+      NGROK_AUTHTOKEN: //tutaj wpisz swój auth
     command:
       - "http"
       - "wordpress:80"
