@@ -1,0 +1,549 @@
+{
+  "name": "PRACA 1 IMAGE",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "images",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1152,
+        304
+      ],
+      "id": "a9376f1a-2558-4bde-9b6b-d16f5ec0a017",
+      "name": "images to base64"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.response;\n\n// clean markdown if ever appears\nconst cleaned = raw\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\nreturn [\n  {\n    json: JSON.parse(cleaned)\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        304
+      ],
+      "id": "c702eef0-0ebd-4615-8413-4de4625103f2",
+      "name": "json parser"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:11434/api/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "product_id",
+              "value": "={{ $('Filter').item.json.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gemma3:fast\",\n  \"prompt\": {{ JSON.stringify($node[\"prompts get\"].json.prompt_vision) }},\n  \"images\": {{ JSON.stringify($json.data.map(item => item.images)) }},\n  \"stream\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1616,
+        304
+      ],
+      "id": "1567b64d-c643-42e8-bc78-8c5c26f795a3",
+      "name": "ollama vision",
+      "retryOnFail": true,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gemma3:fast\",\n  \"prompt\": {{ \n    JSON.stringify(\n      $node[\"prompts get\"].json.prompt_llm + \n      $node[\"qdrant retrieve\"].json.result.map(r => r.payload.zasady_sklepu).join(\"\\n\\n\") + \n      \"\\n\\n---\\nSUROWY OPIS PRODUKTU DO ANALIZY:\\n\" + \n      $node[\"json parser1\"].json.clean_description\n    ) \n  }},\n  \"stream\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2512,
+        304
+      ],
+      "id": "35ba64d5-1d5a-4a04-b15a-ea9c2f1d3ca4",
+      "name": "ollama llm",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let rawResponse = $input.item.json.response;\n\n// 1. Czyścimy tekst (gwiazdki, entery)\nlet cleanText = rawResponse.replace(/\\*/g, '')\n                           .replace(/[\\n\\r]+/g, ' ')\n                           .replace(/\\s\\s+/g, ' ')\n                           .trim();\n\n// 2. NOWOŚĆ: Uciekamy cudzysłowy, żeby nie rozwalały struktury JSON\nlet escapedText = cleanText.replace(/\"/g, '\\\\\"');\n\nreturn {\n  clean_description: escapedText\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        304
+      ],
+      "id": "b62be476-cc7f-425f-a1a8-89c3abc165c8",
+      "name": "json parser1"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1104,
+        192
+      ],
+      "id": "0175dac4-17fc-4f64-83de-b01b872a5f3d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wooCommerce",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        192
+      ],
+      "id": "7b6b1558-48b8-4cde-8085-0c3e8c8aa016",
+      "name": "Get many products",
+      "credentials": {
+        "wooCommerceApi": {
+          "id": "QGWMNqr9YkHq6mcE",
+          "name": "WooCommerce account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fb9734d6-a13e-407d-998e-5d7adff9ab0e",
+              "leftValue": "={{ $json.meta_data.find(x => x.key === '_is_ai_generated_draft')?.value }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "e6f11f5b-9ef3-4cbb-a990-7cf0f71a52d5",
+              "leftValue": "={{ $json.images.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -272,
+        192
+      ],
+      "id": "b3df316a-aac4-4a23-8425-3a7876c2b1ef",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $node[\"ngrok address\"].json.site }}/wp-json/wc/v3/products/{{ $('Filter').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "wooCommerceApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  JSON.stringify({\n    name: $json.name,\n    description: $json.description,\n    short_description: $json.short_description,\n    status: \"pending\",\n    // Mapujemy tablicę tekstów na tablicę obiektów z kluczem name\n    categories: $json.categories ? $json.categories.map(cat => ({ name: cat })) : [],\n    tags: $json.tags ? $json.tags.map(tag => ({ name: tag })) : []\n  }) \n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        528,
+        -384
+      ],
+      "id": "40978adb-d46d-4581-8ca9-16d048f35555",
+      "name": "product publication1",
+      "alwaysOutputData": false,
+      "credentials": {
+        "wooCommerceApi": {
+          "id": "QGWMNqr9YkHq6mcE",
+          "name": "WooCommerce account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        160,
+        192
+      ],
+      "id": "a595c655-e027-483a-832a-fed562daea52",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"nomic-embed-text\", \n  \"prompt\": \"{{ $json.clean_description }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2064,
+        304
+      ],
+      "id": "413e074d-8964-4e3e-adf2-17e3892be897",
+      "name": "ollama embed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:6333/collections/sklep/points/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vector\": {{ JSON.stringify($json.embedding) }},\n  \"limit\": 2,\n  \"with_payload\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2288,
+        304
+      ],
+      "id": "407f4a85-ab29-4fd4-a5d2-9e665c9f79ef",
+      "name": "qdrant retrieve"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.src }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "product_id",
+              "value": "={{ $('Filter').item.json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        208
+      ],
+      "id": "387d6a82-f620-48b3-88ee-a17f19721f04",
+      "name": "image from wc (main photo)"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "images",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        448,
+        208
+      ],
+      "id": "ccf84083-6973-4d7a-a4b0-cb51bc429371",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        304
+      ],
+      "id": "f86176b5-0425-4386-bbca-5f5848fa431f",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('ngrok address').item.json.site }}/wp-json/system-ai/v1/prompts",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -672,
+        192
+      ],
+      "id": "195ba297-1605-427a-a6ec-00059d73afdc",
+      "name": "prompts get"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63779897-b7c9-4e3d-9b4f-cc2ba0c25b06",
+              "name": "site",
+              "value": "https://character-cursive-smartly.ngrok-free.dev",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -896,
+        192
+      ],
+      "id": "cf9f4da5-c660-46be-88f0-ce2f7b75055b",
+      "name": "ngrok address"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "images to base64": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "json parser": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ollama vision": {
+      "main": [
+        [
+          {
+            "node": "json parser1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ollama llm": {
+      "main": [
+        [
+          {
+            "node": "json parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "json parser1": {
+      "main": [
+        [
+          {
+            "node": "ollama embed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "ngrok address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many products": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "product publication1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ollama embed": {
+      "main": [
+        [
+          {
+            "node": "qdrant retrieve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "qdrant retrieve": {
+      "main": [
+        [
+          {
+            "node": "ollama llm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "image from wc (main photo)": {
+      "main": [
+        [
+          {
+            "node": "images to base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "image from wc (main photo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "ollama vision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prompts get": {
+      "main": [
+        [
+          {
+            "node": "Get many products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ngrok address": {
+      "main": [
+        [
+          {
+            "node": "prompts get",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "uOARXpjYwE710kTh",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "296d794a-762a-4212-afca-a39d9883bf59",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6780f848433c9209eaf7b082fd2200920b24193b4a5bb4c2ca985cff21172ad"
+  },
+  "id": "wCIaRbPTVNLKjFJi",
+  "tags": []
+}

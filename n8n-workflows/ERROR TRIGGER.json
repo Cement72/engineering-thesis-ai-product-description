@@ -1,0 +1,188 @@
+{
+  "name": "ERROR TRIGGER",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        0
+      ],
+      "id": "9fea71d9-e5e6-47ce-a7f0-523d75551db8",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "content": "TU BYŁBY NODE WYSYŁAJĄCY MAILA O ERRORZE ALE NIE CHCE MI SIĘ ROBIĆ GOOGLE AUTH"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -160
+      ],
+      "id": "0777a6f8-c78c-4bf3-a39f-4db6cd66111e",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "url": "https://character-cursive-smartly.ngrok-free.dev/wp-json/v1/n8n-config/error-emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Token",
+              "value": "password"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        16,
+        -144
+      ],
+      "id": "6988c7d1-ac9b-4734-beed-c74f613c32cd",
+      "name": "get emails"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://character-cursive-smartly.ngrok-free.dev/wp-json/v1/n8n-config/log-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Token",
+              "value": "password"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"{{ $json.execution?.workflow?.name }}\",\n  \"node_name\": \"{{ $json.execution?.error?.node?.name }}\",\n  \"error_message\": \"{{ $json.execution?.error?.description || $json.execution?.error?.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        16,
+        64
+      ],
+      "id": "293ea801-52e4-4516-adc0-50b6677e4c48",
+      "name": "error wp log"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "720b489a-816b-4d87-ab11-7ca1fa614f56",
+              "leftValue": "={{ $json.execution?.item?.json?.productId || $json.execution?.error?.context?.request?.headers?.product_id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        16,
+        256
+      ],
+      "id": "1a778a63-10c9-4375-b07b-5f211dda4382",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://character-cursive-smartly.ngrok-free.dev/wp-json/system-ai/v1/report-error",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"product_id\": {{ parseInt($json.execution?.error?.context?.request?.headers?.product_id || 0) }},\n  \"error_message\": \"{{ ($json.execution?.error?.description || $json.execution?.error?.message || 'Błąd potoku AI').replace(/\"/g, '\\\\\"') }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        240
+      ],
+      "id": "b67b7e42-636b-4520-b263-70118442338f",
+      "name": "product error status"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "get emails",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "error wp log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get emails": {
+      "main": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "product error status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product error status": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "639e2ba5-f951-4e1c-b59b-3e88d0653042",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6780f848433c9209eaf7b082fd2200920b24193b4a5bb4c2ca985cff21172ad"
+  },
+  "id": "uOARXpjYwE710kTh",
+  "tags": []
+}
