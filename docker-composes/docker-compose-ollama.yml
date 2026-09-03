@@ -6,7 +6,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-
     restart: unless-stopped
     deploy:
       resources:
@@ -15,6 +14,12 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    networks:
+      - n8n_default
 
 volumes:
   ollama_data:
+
+networks:
+  n8n_default:
+    external: true
