@@ -7,12 +7,17 @@ services:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-
     environment:
       - N8N_HOST=n8n
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - N8N_METRICS=true
+    networks:
+      - n8n_default
 
 volumes:
   n8n_data:
+
+networks:
+  n8n_default:
+    external: true
