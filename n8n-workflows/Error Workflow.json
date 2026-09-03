@@ -1,0 +1,107 @@
+{
+  "name": "Error Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "60d2b47a-2281-4b67-8206-1e54758557cd",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('ngrok address').item.json.site }}/wp-json/v1/n8n-config/log-error",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"{{ $json.workflow.name }}\",\n  \"node_name\": \"{{ $json.execution.error.node.name }}\",\n\"node_name\": \"{{ $json.execution.error.node.name }}\",\n  \"error_message\": \"{{ $json.execution.error.description || $json.execution.error.message }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        0
+      ],
+      "id": "d0da1416-24a4-4e33-9d46-e89be16a09cd",
+      "name": "error wp log"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63779897-b7c9-4e3d-9b4f-cc2ba0c25b06",
+              "name": "site",
+              "value": "https://character-cursive-smartly.ngrok-free.dev",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "a5c7dc7e-a176-43c9-a0b6-5a193eb19c21",
+      "name": "ngrok address"
+    },
+    {
+      "parameters": {
+        "content": "TUTAJ NALEŻY USTAWIĆ ADRES URL SKLEPU WORDPRESS"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -128
+      ],
+      "id": "60465529-a0bb-49cb-b745-0d241dcb0f4f",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "ngrok address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ngrok address": {
+      "main": [
+        [
+          {
+            "node": "error wp log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "77d8ec4f-22fa-47ea-a43a-fd8617a814b2",
+  "meta": {
+    "instanceId": "c6780f848433c9209eaf7b082fd2200920b24193b4a5bb4c2ca985cff21172ad"
+  },
+  "id": "AyjTC1POI5gqPyZq",
+  "tags": []
+}

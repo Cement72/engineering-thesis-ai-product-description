@@ -1,0 +1,227 @@
+{
+  "name": "Qdrant Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "307732e8-3cfc-4ad9-8388-fe1d6f7fc932",
+              "name": "site",
+              "value": "https://character-cursive-smartly.ngrok-free.dev",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1472,
+        -272
+      ],
+      "id": "52442efa-1fa1-4f58-afe4-83e5f339aace",
+      "name": "ngrok address"
+    },
+    {
+      "parameters": {
+        "jsCode": "function stringToUUID(str) {\n  let h1 = 0xdeadbeef ^ 0, h2 = 0x41c6ce57 ^ 0;\n  for (let i = 0, ch; i < str.length; i++) {\n    ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);\n  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);\n  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n\n  // Generowanie ciągu 32 znaków w formacie szesnastkowym\n  const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');\n  const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');\n  const hex3 = ((h1 ^ h2) >>> 0).toString(16).padStart(8, '0');\n  const hex4 = ((h1 + h2) >>> 0).toString(16).padStart(8, '0');\n\n  const raw = (hex1 + hex2 + hex3 + hex4).slice(0, 32);\n\n  // Sformatowanie na poprawny UUID v4 (8-4-4-4-12)\n  return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-4${raw.slice(13, 16)}-a${raw.slice(17, 20)}-${raw.slice(20, 32)}`;\n}\n\n// Przetwarzanie elementów z n8n\nfor (const item of $input.all()) {\n  // Pobieramy treść tekstu (dostosuj ścieżkę, jeśli dane są w innym miejscu)\n  const content = item.json.data || JSON.stringify(item.json);\n  \n  // Generujemy stały UUID na podstawie tej treści\n  item.json.deterministic_id = stringToUUID(content);\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        -272
+      ],
+      "id": "794d729f-0619-4b60-ae5f-47447e5944ee",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "https://character-cursive-smartly.ngrok-free.dev/wp-json/wp/v2/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "mime_type",
+              "value": "text/plain,application/pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1264,
+        -272
+      ],
+      "id": "740e1b18-4c09-4574-8f8e-394599b75603",
+      "name": "get docs"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.guid.rendered }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1056,
+        -272
+      ],
+      "id": "cb76b7af-f2a2-47a1-bd8a-f8ac67721867",
+      "name": "extract docs"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \nJSON.stringify({\n  \"model\": \"nomic-embed-text\",\n  \"prompt\": $json.data\n}) \n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -848,
+        -272
+      ],
+      "id": "fb2a7fc1-23a6-4527-bd6d-a3f14dfb0761",
+      "name": "embed docs"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://host.docker.internal:6333/collections/sklep/points",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\nJSON.stringify({\n  \"points\": [\n    {\n      \"id\": $json.deterministic_id,\n      \"vector\": $json.embedding,\n      \"payload\": {\n        \"text\": $(\"extract docs\").item.json.data\n      }\n    }\n  ]\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -432,
+        -272
+      ],
+      "id": "f70124f3-cbcc-49fa-97d2-aef0ad3b1d49",
+      "name": "qdrant upsert"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1664,
+        -272
+      ],
+      "id": "a4a30a8a-add2-4fd4-b8c1-5a98c3d90e8c",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "content": "TUTAJ NALEŻY USTAWIĆ ADRES URL SKLEPU WORDPRESS"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1536,
+        -400
+      ],
+      "id": "c54140a1-aa34-4f25-bdc0-c1995ffbf207",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "ngrok address": {
+      "main": [
+        [
+          {
+            "node": "get docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "qdrant upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get docs": {
+      "main": [
+        [
+          {
+            "node": "extract docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract docs": {
+      "main": [
+        [
+          {
+            "node": "embed docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "embed docs": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "ngrok address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "803cd328-5271-4a3b-b362-5bc3132775ec",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6780f848433c9209eaf7b082fd2200920b24193b4a5bb4c2ca985cff21172ad"
+  },
+  "id": "aUlVlL9Dwm0Fe1R9",
+  "tags": []
+}
